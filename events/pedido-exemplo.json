@@ -1,0 +1,8 @@
+{
+  "orderId": "PED-2026-001",
+  "customer": { "name": "Ana Souza" },
+  "items": [{ "name": "Pizza Margherita", "quantity": 1 }],
+  "total": 49.9,
+  "payment": { "method": "PIX", "approved": true },
+  "deliveryAddress": "Rua Exemplo, 123"
+}

@@ -1,0 +1,42 @@
+{
+  "Comment": "Fluxo de pedidos do Assistente de Delivery",
+  "StartAt": "Validar pedido",
+  "States": {
+    "Validar pedido": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Arguments": { "FunctionName": "${ValidateOrderArn}", "Payload": "{% $states.input %}" },
+      "Output": "{% $states.result.Payload %}",
+      "Next": "Pedido válido?"
+    },
+    "Pedido válido?": {
+      "Type": "Choice",
+      "Choices": [{ "Condition": "{% $states.input.isValid %}", "Next": "Processar pagamento" }],
+      "Default": "Registrar pedido rejeitado"
+    },
+    "Processar pagamento": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Arguments": { "FunctionName": "${ProcessPaymentArn}", "Payload": "{% $states.input %}" },
+      "Output": "{% $states.result.Payload %}",
+      "Next": "Pagamento aprovado?"
+    },
+    "Pagamento aprovado?": {
+      "Type": "Choice",
+      "Choices": [{ "Condition": "{% $states.input.paymentApproved %}", "Next": "Personalizar atendimento" }],
+      "Default": "Registrar pagamento recusado"
+    },
+    "Personalizar atendimento": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Arguments": { "FunctionName": "${PersonalizeOrderArn}", "Payload": "{% $states.input %}" },
+      "Output": "{% $states.result.Payload %}",
+      "Next": "Registrar pedido confirmado",
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "Registrar falha técnica" }]
+    },
+    "Registrar pedido confirmado": { "Type": "Task", "Resource": "arn:aws:states:::lambda:invoke", "Arguments": { "FunctionName": "${UpdateStatusArn}", "Payload": "{% $merge([$states.input, {'status': 'CONFIRMED'}]) %}" }, "Output": "{% $states.result.Payload %}", "End": true },
+    "Registrar pedido rejeitado": { "Type": "Task", "Resource": "arn:aws:states:::lambda:invoke", "Arguments": { "FunctionName": "${UpdateStatusArn}", "Payload": "{% $merge([$states.input, {'status': 'REJECTED'}]) %}" }, "Output": "{% $states.result.Payload %}", "End": true },
+    "Registrar pagamento recusado": { "Type": "Task", "Resource": "arn:aws:states:::lambda:invoke", "Arguments": { "FunctionName": "${UpdateStatusArn}", "Payload": "{% $merge([$states.input, {'status': 'PAYMENT_DECLINED'}]) %}" }, "Output": "{% $states.result.Payload %}", "End": true },
+    "Registrar falha técnica": { "Type": "Task", "Resource": "arn:aws:states:::lambda:invoke", "Arguments": { "FunctionName": "${UpdateStatusArn}", "Payload": "{% $merge([$states.input, {'status': 'TECHNICAL_ERROR'}]) %}" }, "Output": "{% $states.result.Payload %}", "End": true }
+  }
+}

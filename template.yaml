@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Assistente de delivery orquestrado por Step Functions e Amazon Bedrock.
+
+Parameters:
+  BedrockModelId:
+    Type: String
+    Default: amazon.nova-lite-v1:0
+    Description: Modelo habilitado no Amazon Bedrock da região da stack.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 20
+    MemorySize: 256
+    Tracing: Active
+
+Resources:
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: orderId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: orderId
+          KeyType: HASH
+
+  ValidateOrderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/validate_order/
+      Handler: app.lambda_handler
+
+  ProcessPaymentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/process_payment/
+      Handler: app.lambda_handler
+
+  PersonalizeOrderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/personalize_order/
+      Handler: app.lambda_handler
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+      Policies:
+        - Statement:
+            Effect: Allow
+            Action: bedrock:InvokeModel
+            Resource: '*'
+
+  UpdateStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/update_status/
+      Handler: app.lambda_handler
+      Environment:
+        Variables:
+          ORDERS_TABLE: !Ref OrdersTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OrdersTable
+
+  DeliveryStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Type: STANDARD
+      DefinitionUri: statemachine/delivery.asl.json
+      DefinitionSubstitutions:
+        ValidateOrderArn: !GetAtt ValidateOrderFunction.Arn
+        ProcessPaymentArn: !GetAtt ProcessPaymentFunction.Arn
+        PersonalizeOrderArn: !GetAtt PersonalizeOrderFunction.Arn
+        UpdateStatusArn: !GetAtt UpdateStatusFunction.Arn
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ValidateOrderFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ProcessPaymentFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref PersonalizeOrderFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref UpdateStatusFunction
+
+Outputs:
+  DeliveryStateMachineArn:
+    Description: ARN para iniciar execuções do fluxo de delivery.
+    Value: !Ref DeliveryStateMachine
+  OrdersTableName:
+    Value: !Ref OrdersTable
