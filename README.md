@@ -1,6 +1,6 @@
 # Assistente de Delivery com AWS Step Functions e Amazon Bedrock
 
-Projeto prático da DIO que automatiza a jornada de um pedido de delivery: validação, pagamento, personalização da comunicação com IA e atualização de status.
+Projeto prático do Bootcamp da Nublify no DIO que automatiza a jornada de um pedido de delivery: validação, pagamento, personalização da comunicação com IA e atualização de status.
 
 ## Arquitetura
 
